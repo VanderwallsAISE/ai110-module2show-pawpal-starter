@@ -12,6 +12,13 @@
 - Did your design change during implementation?
 - If yes, describe at least one change and why you made it.
 
+### My initial design focuses on three core user actions:
+
+ 1. Add and manage owner and pet information so the system can store basic details about the owner, their preferences, and their pet.
+
+ 2. Create and edit pet care tasks such as feeding, walking, medication, grooming, and enrichment activities.
+
+ 3. Generate a daily schedule that prioritizes tasks based on importance, duration, available time, and owner preferences.
 ---
 
 ## 2. Scheduling Logic and Tradeoffs
