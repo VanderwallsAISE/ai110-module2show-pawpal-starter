@@ -5,9 +5,26 @@ some care tasks, then uses the Scheduler to show off the Phase 4 algorithms:
 sorting by time, filtering, conflict detection, recurring tasks, and the plan.
 """
 
+import sys
 from datetime import date
 
-from pawpal_system import Owner, Pet, Task, Scheduler, HIGH, MEDIUM, LOW
+from pawpal_system import (
+    Owner,
+    Pet,
+    Task,
+    Scheduler,
+    HIGH,
+    MEDIUM,
+    LOW,
+    priority_label,
+    task_emoji,
+)
+
+# The Windows console defaults to cp1252, which cannot print emoji. Switch stdout
+# to UTF-8 so the priority/task indicators render instead of crashing. This uses
+# only the standard library (no extra dependency).
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
 
 
 def main() -> None:
@@ -20,17 +37,17 @@ def main() -> None:
 
     # 3. Add tasks OUT OF ORDER by time, with mixed priorities, frequencies,
     #    statuses, and start times. Two tasks share 08:00 to show conflicts.
-    roxa.add_task(Task(name="Brush coat", duration=15, priority=LOW,
+    roxa.add_task(Task(name="Grooming", duration=15, priority=LOW,
                        start_time="18:00", frequency="weekly"))
     roxa.add_task(Task(name="Morning walk", duration=30, priority=HIGH,
                        start_time="08:00", frequency="daily"))
-    garfield.add_task(Task(name="Feed", duration=10, priority=HIGH,
+    garfield.add_task(Task(name="Feeding", duration=10, priority=HIGH,
                            start_time="08:00", frequency="daily"))  # conflict w/ walk
-    garfield.add_task(Task(name="Play with toys", duration=20, priority=MEDIUM,
+    garfield.add_task(Task(name="Play / enrichment", duration=20, priority=MEDIUM,
                            start_time="12:00", frequency="one-time"))
 
     # Mark one task complete so filtering by status has something to show.
-    garfield.get_tasks()[0].mark_complete()  # Feed is done
+    garfield.get_tasks()[0].mark_complete()  # Feeding is done
 
     # 4. Add the pets to the owner.
     owner.add_pet(roxa)
@@ -44,7 +61,17 @@ def main() -> None:
     print("Tasks sorted by start time")
     print("=" * 42)
     for task in scheduler.sort_by_time():
-        print(f"  {task.start_time}  {task.pet_name}: {task.name}")
+        print(f"  {task.start_time}  {task_emoji(task.name)} {task.pet_name}: {task.name}")
+
+    # --- Advanced priority scheduling (priority first, then time) -------------
+    print("\n" + "=" * 42)
+    print("Tasks by priority, then start time")
+    print("=" * 42)
+    for task in scheduler.sort_by_priority_then_time():
+        print(
+            f"  {priority_label(task.priority)}  {task.start_time}  "
+            f"{task_emoji(task.name)} {task.pet_name}: {task.name}"
+        )
 
     # --- Filtering ------------------------------------------------------------
     print("\n" + "=" * 42)

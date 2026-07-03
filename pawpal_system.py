@@ -39,6 +39,33 @@ def is_valid_name(name: str) -> bool:
     return bool(_NAME_RE.fullmatch(clean_name(name)))
 
 
+# --------------------------- Display formatting -----------------------------
+# Emoji indicators keep the CLI and Streamlit output friendly and scannable.
+# They are pure presentation helpers — the scheduling logic never depends on them.
+PRIORITY_LABELS = {HIGH: "🔴 High", MEDIUM: "🟡 Medium", LOW: "🟢 Low"}
+
+# Keyed by the lowercase task title (see compare_key) so matching is forgiving.
+TASK_EMOJIS = {
+    "feeding": "🍽️",
+    "morning walk": "🦮",
+    "medication": "💊",
+    "grooming": "🧼",
+    "play / enrichment": "🎾",
+    "clean litter box": "🧹",
+    "vet appointment": "🏥",
+}
+
+
+def priority_label(priority: int) -> str:
+    """Return a colored word for a priority (e.g. '🔴 High'), or the number if unknown."""
+    return PRIORITY_LABELS.get(priority, str(priority))
+
+
+def task_emoji(name: str) -> str:
+    """Return an emoji for a known task title, or a paw print for anything else."""
+    return TASK_EMOJIS.get(compare_key(name), "🐾")
+
+
 def find_time_conflict(tasks: list["Task"], start_time: str) -> "Task | None":
     """Return the first task already at start_time (exact match), or None (O(n))."""
     for task in tasks:
@@ -227,6 +254,22 @@ class Scheduler:
         """Return tasks ordered by start_time, earliest first (O(n log n))."""
         return sorted(self.tasks, key=lambda task: _time_to_minutes(task.start_time))
 
+    def sort_by_priority_then_time(self) -> list[Task]:
+        """Return tasks ordered by priority (HIGH first), then by start_time on ties.
+
+        Sorting on the tuple (priority, minutes-since-midnight) does both passes in
+        one sort: priority 1/2/3 puts HIGH before MEDIUM before LOW, and tasks that
+        share a priority fall into chronological order. This is the "advanced"
+        ordering the daily plan is built from.
+
+        Time complexity: O(n log n) for the single sort.
+        Space complexity: O(n) for the returned list.
+        """
+        return sorted(
+            self.tasks,
+            key=lambda task: (task.priority, _time_to_minutes(task.start_time)),
+        )
+
     def filter_tasks(
         self, pet_name: str | None = None, completed: bool | None = None
     ) -> list[Task]:
@@ -274,8 +317,10 @@ class Scheduler:
     def generate_daily_plan(self, owner: Owner) -> list[Task]:
         """Fill the day with the highest-priority tasks that fit the owner's time.
 
-        Walks the sorted tasks once and greedily keeps each task whose duration
-        still fits in the remaining time budget.
+        Walks the priority-then-time sorted tasks once and greedily keeps each
+        task whose duration still fits in the remaining time budget. Ordering by
+        (priority, start_time) means high-priority tasks are considered first, and
+        same-priority tasks are considered in chronological order.
         """
         if not self.tasks:
             raise ValueError("no tasks available to schedule")
@@ -284,7 +329,7 @@ class Scheduler:
 
         remaining = owner.available_time
         plan: list[Task] = []
-        for task in self.sort_tasks_by_priority():
+        for task in self.sort_by_priority_then_time():
             if not task.is_valid():
                 continue  # ignore malformed tasks added directly to self.tasks
             if task.completion_status:

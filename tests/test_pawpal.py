@@ -86,6 +86,29 @@ def test_scheduler_sorts_tasks_by_time():
     assert times == ["08:00", "12:30", "18:00"]
 
 
+def test_scheduler_sorts_by_priority_then_time():
+    pet = Pet(name="Roxa", species="dog", age=4)
+    # Two HIGH tasks added out of time order, plus a MEDIUM and a LOW.
+    pet.add_task(Task(name="Evening meds", duration=5, priority=HIGH, start_time="20:00"))
+    pet.add_task(Task(name="Morning meds", duration=5, priority=HIGH, start_time="07:00"))
+    pet.add_task(Task(name="Lunch play", duration=20, priority=MEDIUM, start_time="12:00"))
+    pet.add_task(Task(name="Brush", duration=15, priority=LOW, start_time="09:00"))
+
+    scheduler = Scheduler.from_pet(pet)
+    ordered = scheduler.sort_by_priority_then_time()
+
+    # HIGH first (earliest-time HIGH before later HIGH), then MEDIUM, then LOW.
+    assert [t.name for t in ordered] == [
+        "Morning meds",  # HIGH 07:00
+        "Evening meds",  # HIGH 20:00
+        "Lunch play",    # MEDIUM 12:00
+        "Brush",         # LOW 09:00
+    ]
+    # Priorities are non-decreasing across the whole ordering.
+    priorities = [t.priority for t in ordered]
+    assert priorities == sorted(priorities)
+
+
 def test_scheduler_filters_by_pet_and_status():
     owner = Owner(name="Vanderwalls", available_time=120)
     roxa = Pet(name="Roxa", species="dog", age=4)

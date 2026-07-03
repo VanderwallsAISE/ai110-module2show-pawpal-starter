@@ -12,6 +12,8 @@ from pawpal_system import (
     clean_name,
     is_valid_name,
     find_time_conflict,
+    priority_label,
+    task_emoji,
 )
 
 
@@ -203,9 +205,9 @@ else:
             # add_task raises ValueError for invalid or duplicate tasks.
             st.error(str(error))
 
-    # Show the tasks for each pet as a clear table (priority as a word, not a
-    # raw number, plus the frequency so recurring tasks are obvious).
-    priority_words = {HIGH: "high", MEDIUM: "medium", LOW: "low"}
+    # Show the tasks for each pet as a clear table. Priority shows as a colored
+    # word (🔴/🟡/🟢) and each task title gets an emoji, both from pawpal_system
+    # so the CLI and UI stay consistent.
     for pet in owner.get_pets():
         tasks = pet.get_tasks()
         if tasks:
@@ -213,10 +215,10 @@ else:
             st.table(
                 [
                     {
-                        "Task": task.name,
+                        "Task": f"{task_emoji(task.name)} {task.name}",
                         "Start Time": task.start_time,
                         "Duration (min)": task.duration,
-                        "Priority": priority_words[task.priority],
+                        "Priority": priority_label(task.priority),
                         "Frequency": task.frequency,
                     }
                     for task in tasks
@@ -250,23 +252,22 @@ if st.button("Generate schedule"):
         else:
             st.success("No time conflicts detected.")
 
-        # Order the plan chronologically using the Scheduler's own sort_by_time()
-        # method (rather than re-sorting by hand) so the table reads top-to-bottom
-        # through the day.
-        ordered_plan = Scheduler(tasks=plan).sort_by_time()
+        # Order the plan by priority first, then start_time, using the Scheduler's
+        # own sort_by_priority_then_time() method (rather than re-sorting by hand)
+        # so the most important tasks sit at the top and ties read chronologically.
+        ordered_plan = Scheduler(tasks=plan).sort_by_priority_then_time()
 
         # Table display that shows every field a pet owner cares about: which pet,
-        # the task, when it starts, how long it takes, its priority, and how often
-        # it repeats (frequency).
+        # the task (with an emoji), when it starts, how long it takes, its priority
+        # (colored), and how often it repeats (frequency).
         st.markdown("### 📋 Today's Plan")
-        priority_labels = {HIGH: "high", MEDIUM: "medium", LOW: "low"}
         rows = [
             {
                 "Pet": task.pet_name,
-                "Task": task.name,
+                "Task": f"{task_emoji(task.name)} {task.name}",
                 "Start Time": task.start_time,
                 "Duration (min)": task.duration,
-                "Priority": priority_labels[task.priority],
+                "Priority": priority_label(task.priority),
                 "Frequency": task.frequency,
             }
             for task in ordered_plan

@@ -35,8 +35,11 @@ a Streamlit UI.
 - **Streamlit UI** — A clean, single-page app for entering owners, pets, and
   tasks and generating the plan, with `st.success` / `st.error` / `st.warning`
   feedback and `st.table` schedule displays.
-- **pytest test coverage** — 12 automated tests cover the core scheduling
+- **pytest test coverage** — 13 automated tests cover the core scheduling
   behaviors (see [Testing PawPal+](#-testing-pawpal)).
+
+See also the [Optional Extensions](#-optional-extensions) section for advanced
+priority scheduling and professional output formatting.
 
 ---
 
@@ -114,30 +117,40 @@ The whole app lives on one page. Here is what you can do and a typical workflow.
 
 ## 🖥️ Sample Output
 
-Running `python main.py` demonstrates the scheduling algorithms in the terminal:
+Running `python main.py` demonstrates the scheduling algorithms in the terminal,
+including **priority-based scheduling** and the **emoji indicators** (Optional
+Extensions):
 
 ```
 ==========================================
 Tasks sorted by start time
 ==========================================
-  08:00  Roxa: Morning walk
-  08:00  Garfield: Feed
-  12:00  Garfield: Play with toys
-  18:00  Roxa: Brush coat
+  08:00  🦮 Roxa: Morning walk
+  08:00  🍽️ Garfield: Feeding
+  12:00  🎾 Garfield: Play / enrichment
+  18:00  🧼 Roxa: Grooming
+
+==========================================
+Tasks by priority, then start time
+==========================================
+  🔴 High  08:00  🦮 Roxa: Morning walk
+  🔴 High  08:00  🍽️ Garfield: Feeding
+  🟡 Medium  12:00  🎾 Garfield: Play / enrichment
+  🟢 Low  18:00  🧼 Roxa: Grooming
 
 ==========================================
 Filtered tasks
 ==========================================
 Roxa's tasks:
-  - Brush coat
+  - Grooming
   - Morning walk
 Completed tasks:
-  - Garfield: Feed
+  - Garfield: Feeding
 
 ==========================================
 Conflict warnings
 ==========================================
-  [!] Conflict at 08:00: Roxa's Morning walk, Garfield's Feed
+  [!] Conflict at 08:00: Roxa's Morning walk, Garfield's Feeding
 
 ==========================================
 Recurring task example
@@ -147,10 +160,14 @@ Recurring task example
 ==========================================
 Today's Schedule for Vanderwalls
 ==========================================
-- 12:00 | Garfield | Play with toys: 20 min (medium priority)
-- 18:00 | Roxa | Brush coat: 15 min (low priority)
+- 12:00 | Garfield | Play / enrichment: 20 min (medium priority)
+- 18:00 | Roxa | Grooming: 15 min (low priority)
 Total: 35 min across 2 task(s).
 ```
+
+The **Tasks by priority, then start time** block shows the advanced ordering:
+both HIGH tasks come first, and because they tie at 08:00 they stay in
+chronological order, followed by MEDIUM then LOW.
 
 ---
 
@@ -176,6 +193,8 @@ python -m pytest
 - The `find_time_conflict` helper used to block clashes in the UI
 - Recurring daily/weekly `next_occurrence`, and that a completed daily task's next
   occurrence resets to not-done
+- Priority-then-time ordering (`sort_by_priority_then_time`) — HIGH before MEDIUM
+  before LOW, with same-priority tasks in chronological order
 
 **Sample passing output**
 
@@ -184,11 +203,11 @@ python -m pytest
 platform win32 -- Python 3.14.2, pytest-9.1.1, pluggy-1.6.0
 rootdir: C:\Users\istea\CodePath\ai110-module2show-pawpal-starter
 plugins: anyio-4.14.0
-collected 12 items
+collected 13 items
 
-tests\test_pawpal.py ............                                        [100%]
+tests\test_pawpal.py .............                                       [100%]
 
-============================= 12 passed in 0.04s ==============================
+============================= 13 passed in 0.03s ==============================
 ```
 
 **Confidence: ★★★★☆ (4 / 5)**
@@ -211,7 +230,8 @@ The scheduling behaviors live in the `Scheduler`, plus name-validation helpers
 | Filtering | `Scheduler.filter_tasks(pet_name=None, completed=None)` | Returns tasks matching an optional pet name (case-insensitive) and/or completion status. Both filters are optional and combine. | Time `O(n)`, space `O(n)` |
 | Conflict handling | `Scheduler.find_conflicts()` | Groups tasks by `start_time` in a dictionary and returns a warning string for any exact same-time clash. Exact-time detection only (no overlap ranges yet). | Time `O(n)`, space `O(n)` |
 | Recurring tasks | `Scheduler.next_occurrence(task, from_date=None)` | For a `"daily"` or `"weekly"` task, returns `(next_date, new_task)` using `timedelta`. Returns `None` for `"one-time"` tasks. | Time `O(1)`, space `O(1)` |
-| Daily planning | `Scheduler.generate_daily_plan(owner)` | Greedily keeps the highest-priority tasks that still fit the owner's remaining time. | Time `O(n log n)`, space `O(n)` |
+| Priority-then-time sort | `Scheduler.sort_by_priority_then_time()` | Sorts on the tuple `(priority, start_time)` so HIGH comes before MEDIUM before LOW, and same-priority tasks fall into chronological order. | Time `O(n log n)`, space `O(n)` |
+| Daily planning | `Scheduler.generate_daily_plan(owner)` | Greedily keeps the highest-priority tasks (via `sort_by_priority_then_time()`) that still fit the owner's remaining time. | Time `O(n log n)`, space `O(n)` |
 
 **Sorting** — `sort_by_time()` parses each `"HH:MM"` string into minutes and sorts
 ascending, so the schedule reads top-to-bottom through the day.
@@ -228,6 +248,48 @@ same `start_time`. In the UI these are non-blocking warnings, while the
 `timedelta(weeks=1)`.
 
 ---
+
+## 🌟 Optional Extensions
+
+These two optional challenges build on the core project without adding data
+persistence, databases, logins, or other production features.
+
+### Challenge 3 — Advanced Priority Scheduling
+
+Scheduling now sorts by **priority first, then start time**. The order is HIGH →
+MEDIUM → LOW, and when two tasks share a priority they fall into chronological
+order by `start_time`.
+
+- **Implemented by:** `Scheduler.sort_by_priority_then_time()` in
+  `pawpal_system.py`. It sorts once on the tuple key
+  `(task.priority, minutes_since_midnight)`. Because the priority constants are
+  `HIGH = 1`, `MEDIUM = 2`, `LOW = 3`, ascending sort puts HIGH first, and the
+  second element of the tuple breaks ties chronologically.
+- **Used by:** `Scheduler.generate_daily_plan()` (which now builds the plan from
+  this ordering), the CLI demo in `main.py`, and the Streamlit *Today's Plan*
+  table in `app.py`.
+- **Complexity:** Time **`O(n log n)`** (one comparison sort), space **`O(n)`**
+  (the new list of `n` tasks).
+- **Tested by:** `test_scheduler_sorts_by_priority_then_time` in
+  `tests/test_pawpal.py`.
+
+### Challenge 4 — Professional UI and Output Formatting
+
+Both the CLI and the Streamlit tables now use simple, readable indicators — no new
+libraries required.
+
+- **Priority indicators:** 🔴 High, 🟡 Medium, 🟢 Low.
+- **Task emojis:** 🍽️ Feeding, 🦮 Morning walk, 💊 Medication, 🧼 Grooming,
+  🎾 Play / enrichment, 🧹 Clean litter box, 🏥 Vet appointment (anything else
+  falls back to 🐾).
+- **Implemented by:** `priority_label()` and `task_emoji()` (plus the
+  `PRIORITY_LABELS` and `TASK_EMOJIS` maps) in `pawpal_system.py`. Keeping the
+  formatting in one place means the CLI and UI stay consistent.
+- **Used by:** `main.py` (sorted-by-time and priority-then-time sections) and
+  `app.py` (the per-pet task tables and the *Today's Plan* table).
+- **Note:** `main.py` calls `sys.stdout.reconfigure(encoding="utf-8")` at startup
+  so the emoji render on the Windows console (which defaults to cp1252). This uses
+  only the standard library.
 
 ## 🗂️ Project Structure
 
