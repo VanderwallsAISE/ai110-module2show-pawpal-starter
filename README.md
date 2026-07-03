@@ -72,9 +72,24 @@ Total: 35 min across 2 task(s).
 ```bash
 # Run the full test suite:
 pytest
+The PawPal+ backend is tested with pytest. The tests verify the core scheduling logic, including task completion, task addition, name validation, chronological sorting, filtering by pet/status, recurring task behavior, and exact-time conflict detection.
 
-# Run with coverage:
-pytest --cov
+To run the test suite:
+
+python -m pytest
+
+Successful test output:
+================================================================================================== test session starts ===================================================================================================
+platform win32 -- Python 3.14.2, pytest-9.1.1, pluggy-1.6.0
+rootdir: C:\Users\istea\CodePath\ai110-module2show-pawpal-starter
+plugins: anyio-4.14.0
+collected 12 items                                                                                                                                                                                                        
+
+tests\test_pawpal.py ............                                                                                                                                                                                   [100%]
+
+=================================================================================================== 12 passed in 0.05s ===================================================================================================
+
+I feel confident that the core backend logic works because the automated tests verify the most important scheduling behaviors. I am leaving one star open because the Streamlit UI still requires manual testing, especially for session state behavior and user input interactions.
 ```
 
 Sample test output:

@@ -149,3 +149,21 @@ def test_recurring_task_creates_next_occurrence():
     assert next_weekly[0] == date(2026, 7, 10)
 
     assert scheduler.next_occurrence(one_time) is None
+
+
+def test_completing_daily_task_returns_fresh_next_occurrence():
+    scheduler = Scheduler()
+    walk = Task(name="Walk", duration=30, priority=HIGH, start_time="08:00", frequency="daily")
+
+    # Complete today's task, the way an owner would after their morning walk.
+    walk.mark_complete()
+    assert walk.completion_status is True
+
+    result = scheduler.next_occurrence(walk, from_date=date(2026, 7, 3))
+    assert result is not None
+    next_date, next_task = result
+
+    # Tomorrow's occurrence should be scheduled for the following day...
+    assert next_date == date(2026, 7, 4)
+    # ...and start over as NOT done, so it still gets scheduled tomorrow.
+    assert next_task.completion_status is False
