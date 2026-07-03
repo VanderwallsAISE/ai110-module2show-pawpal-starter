@@ -203,16 +203,25 @@ else:
             # add_task raises ValueError for invalid or duplicate tasks.
             st.error(str(error))
 
-    # Show the tasks for each pet.
+    # Show the tasks for each pet as a clear table (priority as a word, not a
+    # raw number, plus the frequency so recurring tasks are obvious).
+    priority_words = {HIGH: "high", MEDIUM: "medium", LOW: "low"}
     for pet in owner.get_pets():
         tasks = pet.get_tasks()
         if tasks:
             st.write(f"**{pet.name}'s tasks:**")
-            for task in tasks:
-                st.write(
-                    f"- {task.start_time} {task.name}: {task.duration} min "
-                    f"(priority {task.priority}, {task.frequency})"
-                )
+            st.table(
+                [
+                    {
+                        "Task": task.name,
+                        "Start Time": task.start_time,
+                        "Duration (min)": task.duration,
+                        "Priority": priority_words[task.priority],
+                        "Frequency": task.frequency,
+                    }
+                    for task in tasks
+                ]
+            )
 
 st.divider()
 
@@ -226,26 +235,49 @@ if st.button("Generate schedule"):
         scheduler = Scheduler.from_owner(owner)
         plan = scheduler.generate_daily_plan(owner)
 
-        # Show conflict warnings without crashing (same-start-time tasks).
-        for warning in scheduler.find_conflicts():
-            st.warning(warning)
+        # Conflict detection: exact same-start-time clashes are shown here as
+        # NON-blocking warnings so the app never crashes on a clash. (Exact-time
+        # conflicts are also blocked up front in "Add a Task"; this catches any
+        # that slipped in and reminds the owner two tasks share a minute.)
+        conflicts = scheduler.find_conflicts()
+        if conflicts:
+            st.warning(
+                "Some tasks are scheduled at the same start time. "
+                "You may not be able to do both at once:"
+            )
+            for warning in conflicts:
+                st.warning(warning)
+        else:
+            st.success("No time conflicts detected.")
 
-        # Table-style display that makes clear which pet each task belongs to.
-        st.markdown("### Today's Plan")
+        # Order the plan chronologically using the Scheduler's own sort_by_time()
+        # method (rather than re-sorting by hand) so the table reads top-to-bottom
+        # through the day.
+        ordered_plan = Scheduler(tasks=plan).sort_by_time()
+
+        # Table display that shows every field a pet owner cares about: which pet,
+        # the task, when it starts, how long it takes, its priority, and how often
+        # it repeats (frequency).
+        st.markdown("### 📋 Today's Plan")
         priority_labels = {HIGH: "high", MEDIUM: "medium", LOW: "low"}
         rows = [
             {
-                "Time": task.start_time,
                 "Pet": task.pet_name,
                 "Task": task.name,
+                "Start Time": task.start_time,
                 "Duration (min)": task.duration,
                 "Priority": priority_labels[task.priority],
+                "Frequency": task.frequency,
             }
-            for task in sorted(plan, key=lambda t: t.start_time)
+            for task in ordered_plan
         ]
         st.table(rows)
+
         total = sum(task.duration for task in plan)
-        st.caption(f"Total: {total} min across {len(plan)} task(s).")
+        st.success(
+            f"Scheduled {len(plan)} task(s) using {total} of "
+            f"{owner.available_time} available minutes."
+        )
     except ValueError as error:
         # generate_daily_plan raises ValueError if there are no tasks / no time.
         st.error(str(error))
