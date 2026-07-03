@@ -17,10 +17,30 @@ VALID_PRIORITIES = (HIGH, MEDIUM, LOW)
 class Task:
     """A single pet-care activity, e.g. a 30-minute walk."""
 
-    name: str
-    duration: int  # minutes
+    name: str  # description of the activity
+    duration: int  # minutes (the "time" the task takes)
     priority: int  # 1 = high, 2 = medium, 3 = low
     category: str = "general"
+
+    frequency: str = "daily"  # e.g. "daily", "weekly"
+    completion_status: bool = False  # True once the task is done
+
+    def __post_init__(self) -> None:
+        """Normalize the task name after the dataclass is created."""
+        # Normalize the name so duplicate checks can't be bypassed by stray spaces.
+        self.name = self.name.strip()
+
+    def mark_done(self) -> None:
+        """Mark this task as completed."""
+        self.completion_status = True
+
+    def mark_complete(self) -> None:
+        """Mark this task as completed."""
+        self.mark_done()
+
+    def mark_pending(self) -> None:
+        """Mark this task as not yet done (e.g. resetting for a new day)."""
+        self.completion_status = False
 
     def update_duration(self, duration: int) -> None:
         """Set a new duration after checking it is positive."""
@@ -52,9 +72,14 @@ class Pet:
     age: int
     tasks: list[Task] = field(default_factory=list)
 
+    def __post_init__(self) -> None:
+        """Normalize the pet name after the dataclass is created."""
+        self.name = self.name.strip()
+
     def task_exists(self, name: str) -> bool:
         """Return True if a task with this name (case-insensitive) is present."""
-        return any(task.name.lower() == name.lower() for task in self.tasks)
+        name = name.strip().lower()
+        return any(task.name.lower() == name for task in self.tasks)
 
     def add_task(self, task: Task) -> None:
         """Add a task, rejecting invalid tasks and duplicate names."""
@@ -68,9 +93,11 @@ class Pet:
         """Remove the task with the given name."""
         if not self.task_exists(name):
             raise ValueError(f"no task named '{name}' for {self.name}")
-        self.tasks = [t for t in self.tasks if t.name.lower() != name.lower()]
+        target = name.strip().lower()
+        self.tasks = [t for t in self.tasks if t.name.lower() != target]
 
     def get_tasks(self) -> list[Task]:
+        """Return this pet's list of tasks."""
         return self.tasks
 
 
@@ -83,9 +110,14 @@ class Owner:
     preferences: dict[str, str] = field(default_factory=dict)
     pets: list[Pet] = field(default_factory=list)
 
+    def __post_init__(self) -> None:
+        """Normalize the owner name after the dataclass is created."""
+        self.name = self.name.strip()
+
     def pet_exists(self, name: str) -> bool:
         """Return True if a pet with this name (case-insensitive) is present."""
-        return any(pet.name.lower() == name.lower() for pet in self.pets)
+        name = name.strip().lower()
+        return any(pet.name.lower() == name for pet in self.pets)
 
     def add_pet(self, pet: Pet) -> None:
         """Add a pet, rejecting empty names and duplicates."""
@@ -99,12 +131,19 @@ class Owner:
         """Remove the pet with the given name."""
         if not self.pet_exists(name):
             raise ValueError(f"no pet named '{name}'")
-        self.pets = [p for p in self.pets if p.name.lower() != name.lower()]
+        target = name.strip().lower()
+        self.pets = [p for p in self.pets if p.name.lower() != target]
 
     def get_pets(self) -> list[Pet]:
+        """Return this owner's list of pets."""
         return self.pets
 
+    def get_all_tasks(self) -> list[Task]:
+        """Return every task across all pets, in pet order then task order."""
+        return [task for pet in self.pets for task in pet.get_tasks()]
+
     def set_preferences(self, preferences: dict[str, str]) -> None:
+        """Replace this owner's preferences with the given dictionary."""
         self.preferences = preferences
 
 
@@ -114,6 +153,16 @@ class Scheduler:
 
     tasks: list[Task] = field(default_factory=list)
     daily_plan: list[Task] = field(default_factory=list)
+
+    @classmethod
+    def from_pet(cls, pet: Pet) -> "Scheduler":
+        """Build a scheduler for a single pet's tasks (the Pet -> Scheduler link)."""
+        return cls(tasks=pet.get_tasks())
+
+    @classmethod
+    def from_owner(cls, owner: Owner) -> "Scheduler":
+        """Build a scheduler from every task across all of an owner's pets."""
+        return cls(tasks=owner.get_all_tasks())
 
     def sort_tasks_by_priority(self) -> list[Task]:
         """Return tasks ordered by priority (high first), keeping input order on ties."""
@@ -134,6 +183,10 @@ class Scheduler:
         remaining = owner.available_time
         plan: list[Task] = []
         for task in self.sort_tasks_by_priority():
+            if not task.is_valid():
+                continue  # ignore malformed tasks added directly to self.tasks
+            if task.completion_status:
+                continue  # already done today, no need to schedule it
             if task.duration <= remaining:
                 plan.append(task)
                 remaining -= task.duration
