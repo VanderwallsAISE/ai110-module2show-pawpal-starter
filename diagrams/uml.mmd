@@ -7,6 +7,7 @@ classDiagram
         +add_pet()
         +remove_pet()
         +get_pets()
+        +get_all_tasks()
         +pet_exists()
         +set_preferences()
     }
@@ -27,6 +28,10 @@ classDiagram
         +duration
         +priority
         +category
+        +frequency
+        +completion_status
+        +mark_done()
+        +mark_pending()
         +update_duration()
         +update_priority()
         +is_valid()
@@ -35,6 +40,8 @@ classDiagram
     class Scheduler {
         +tasks
         +daily_plan
+        +from_pet()
+        +from_owner()
         +sort_tasks_by_priority()
         +generate_daily_plan()
         +validate_schedule()
@@ -43,5 +50,5 @@ classDiagram
 
     Owner "1" --> "0..*" Pet : owns
     Pet "1" --> "0..*" Task : has
-    Scheduler --> Task : uses
-    Scheduler --> Owner : generates plan for
+    Scheduler --> Task : schedules
+    Scheduler ..> Owner : reads tasks &amp; time from
